@@ -37,13 +37,13 @@ def animate(i, dataList, ser):
     try:
         # Leer y decodificar el dato recibido
         SP32Data_string = ser.readline().decode('ascii').strip()
-        print(f"{SP32Data_string}")  # Debug: Ver el dato recibido
+        #print(f"{SP32Data_string}")  # Debug: Ver el dato recibido
 
         # Convertir a flotante
         SP32Data_float = float(SP32Data_string)
         dataList.append(SP32Data_float)
     except ValueError:
-        print(f": {SP32Data_string}")  # Debug: Imprimir error
+        #print(f": {SP32Data_string}")  # Debug: Imprimir error
         return  # Salir de la función si no se puede convertir
 
     dataList = dataList[-50:]  # Limitamos la lista a 50 elementos
@@ -74,7 +74,7 @@ btn_iniciar = tk.Button(frame, text="Iniciar", command=iniciar_proceso)
 btn_iniciar.pack(side=tk.LEFT)
 
 # Botón de pánico
-btn_panic = tk.Button(root, text="Pánico", command=enviar_panic, bg="red", fg="white")
+btn_panic = tk.Button(root, text="Emergencia", command=enviar_panic, bg="red", fg="white")
 btn_panic.pack(pady=10)
 
 # Canvas para la visualización del tanque
