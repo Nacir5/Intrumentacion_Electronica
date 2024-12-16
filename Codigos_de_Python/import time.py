@@ -9,7 +9,7 @@ import matplotlib.animation as animation
 def iniciar_proceso():
     """Función para iniciar la lectura de datos y animación."""
     altura = entrada_altura.get()
-    
+
     try:
         # Validación de que la altura es un flotante
         altura_float = float(altura)
@@ -18,11 +18,11 @@ def iniciar_proceso():
     except ValueError:
         messagebox.showerror("Entrada inválida", "Por favor ingrese un número flotante entre 0 y 10.")
         return
-    
+
     # Enviar altura al ESP32
     ser.write(b'g\n')  # Comando para recibir datos
     ser.write(f"{altura_float}\n".encode('ascii'))  # Enviamos la altura como string codificada
-    
+
     # Iniciar animación
     ani.event_source.start()
 
@@ -37,13 +37,10 @@ def animate(i, dataList, ser):
     try:
         # Leer y decodificar el dato recibido
         SP32Data_string = ser.readline().decode('ascii').strip()
-        #print(f"{SP32Data_string}")  # Debug: Ver el dato recibido
-
         # Convertir a flotante
         SP32Data_float = float(SP32Data_string)
         dataList.append(SP32Data_float)
     except ValueError:
-        #print(f": {SP32Data_string}")  # Debug: Imprimir error
         return  # Salir de la función si no se puede convertir
 
     dataList = dataList[-50:]  # Limitamos la lista a 50 elementos
@@ -51,12 +48,15 @@ def animate(i, dataList, ser):
     ax.plot(dataList)
     ax.set_ylim([0, 12])
     ax.set_title("Nivel de control")
-    ax.set_ylabel("Altura del agua ")
+    ax.set_ylabel("Altura del agua (cm)")
 
     # Actualizar visualización del tanque
     tanque_canvas.delete("nivel")
-    nivel_tanque = max(0, min(100, 100 - float(SP32Data_string) * 25))  # Escala de 0 a 100 (10 cm a 0)
+    nivel_tanque = max(0, min(100, 100 - SP32Data_float * 10))  # Escala de 0 a 100 (10 cm a 0)
     tanque_canvas.create_rectangle(50, nivel_tanque, 150, 100, fill="blue", tags="nivel")
+
+    # Actualizar etiqueta con altura
+    etiqueta_altura.config(text=f"Altura actual: {SP32Data_float:.2f} cm")
 
 # Configuración de la interfaz de Tkinter
 root = tk.Tk()
@@ -80,7 +80,19 @@ btn_panic.pack(pady=10)
 # Canvas para la visualización del tanque
 tanque_canvas = tk.Canvas(root, width=200, height=120, bg="white")
 tanque_canvas.pack(pady=10)
+
+# Dibujar el contorno del tanque
 tanque_canvas.create_rectangle(50, 0, 150, 100, outline="black", width=2)
+
+# Dibujar escala de la "regla"
+for i in range(11):
+    y = 100 - i * 10
+    tanque_canvas.create_line(45, y, 50, y, fill="black", width=2)  # Marcas de la regla
+    tanque_canvas.create_text(35, y, text=f"{i}", anchor="e", font=("Arial", 8))  # Etiquetas
+
+# Etiqueta para mostrar la altura actual
+etiqueta_altura = tk.Label(root, text="Altura actual: 0.00 cm", font=("Arial", 12))
+etiqueta_altura.pack(pady=5)
 
 # Gráfica con matplotlib incrustada en Tkinter
 fig = Figure(figsize=(5, 3), dpi=100)
