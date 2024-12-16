@@ -34,6 +34,7 @@ hw_timer_t *pumpTimer = NULL;
 volatile bool blinkyState = false;
 volatile bool pumpState = false;
 volatile bool enablePump = false;
+bool detener = false;                 // variable que sirve para deneter el codigo por el boto de panico
 
 // Blinky function 
 void IRAM_ATTR onBlinkyTimer() {
@@ -97,6 +98,18 @@ void loop() {
         Serial.println(water_Level); 
 
       } 
+
+      else if(userInput == "stop"){
+          detener = true;
+      }
+
+      else if(userInput == "todo bien pa"){
+          detener = false;
+      }
+
+      else if(detener){
+        delay(100000);
+      }
 
       else{
 
