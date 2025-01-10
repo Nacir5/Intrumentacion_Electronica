@@ -10,7 +10,7 @@ float water_Level = 0;                // Water level in cm
 
 
 float user_value = 10;                   // user level input
-float user_valueCod = 1;               // Valor para que la codificacion no se comparene valores negativos
+float user_valueCod = 1;               // Valor para que la codificacion no se compare en valores negativos
 
 // Visual indicators definitions
 #define blinky            11
@@ -19,8 +19,8 @@ float user_valueCod = 1;               // Valor para que la codificacion no se c
 
 // Macros
 #define MAX_RANGE_VALUE   3.3
-#define SLOPE             0.15978
-#define VOLTAGE_OFFSET    0.83384
+#define SLOPE             43.8
+#define VOLTAGE_OFFSET    -43.5
 
 // Factor de autocorrección 
 #define OFFSET_DECODE     48.00
@@ -34,7 +34,6 @@ hw_timer_t *pumpTimer = NULL;
 volatile bool blinkyState = false;
 volatile bool pumpState = false;
 volatile bool enablePump = false;
-bool detener = false;                 // variable que sirve para deneter el codigo por el boto de panico
 
 // Blinky function 
 void IRAM_ATTR onBlinkyTimer() {
@@ -71,7 +70,7 @@ void setup() {
   // Pump timer initialization
   pumpTimer = timerBegin(1, 80, true); // Timer 1, prescaler 80 (1us per tick)
   timerAttachInterrupt(pumpTimer, &onPumpTimer, true);
-  timerAlarmWrite(pumpTimer, 1000000, true); // 1s interval (default)
+  timerAlarmWrite(pumpTimer, 500000, true); // 1s interval (default)
   timerAlarmEnable(pumpTimer);
 
   delay(100);
@@ -93,22 +92,18 @@ void loop() {
         voltage_Value = ((raw_Data)/(4096))* MAX_RANGE_VALUE;
 
         // Voltage to water level
-        water_Level = ((voltage_Value)-(VOLTAGE_OFFSET))/(SLOPE);
+        water_Level = (SLOPE*voltage_Value)+(VOLTAGE_OFFSET);
+
+        water_Level = water_Level/10;
 
         Serial.println(water_Level); 
 
       } 
 
       else if(userInput == "stop"){
-          detener = true;
-      }
 
-      else if(userInput == "todo bien pa"){
-          detener = false;
-      }
+        user_value = 10;
 
-      else if(detener){
-        delay(100000);
       }
 
       else{
@@ -119,7 +114,7 @@ void loop() {
         float new_value = userInput.toFloat(); // Convertir a flotante
         //Serial.println("Valor convertido: " + String(new_value)); // Mostrar el valor convertido
 
-        if (new_value > 0 && new_value <= 10) {
+        if (new_value > 0.5 && new_value <= 10) {
           user_value = new_value; // Actualizar el nivel de agua deseado
           Serial.println("Nuevo nivel deseado: " + String(user_value));
         } else {
@@ -130,9 +125,19 @@ void loop() {
   }
 
 
-  if(water_Level > user_value)
+  if(water_Level <= 0.5)
   {
+    // Disable pump control when too low for control
+    enablePump = false;
 
+    digitalWrite(Pump_ON, LOW);
+
+    digitalWrite(LED_Pump_OFF, HIGH);
+
+  }
+  
+  else if(water_Level > user_value)
+  {
       float Reduction = water_Level - user_value;
 
       // Enable pump control if water level exceeds user value
@@ -140,11 +145,9 @@ void loop() {
 
           // Adjust pump timer frequency based on difference
     if (Reduction > 1.0) {
-      timerAlarmWrite(pumpTimer, 1000000, true); // Faster switching (500ms)
-    } else if (Reduction > 0.5) {
-      timerAlarmWrite(pumpTimer, 500000, true); // Normal switching (1s)
+      timerAlarmWrite(pumpTimer, 300000, true); // Faster switching 
     } else {
-      timerAlarmWrite(pumpTimer, 250000, true); // Slower switching (2s)
+      timerAlarmWrite(pumpTimer, 100000, true); // Slower switching 
     }
 
       // Visual indicators

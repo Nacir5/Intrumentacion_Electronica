@@ -13,10 +13,10 @@ def iniciar_proceso():
     try:
         # Validación de que la altura es un flotante
         altura_float = float(altura)
-        if altura_float <= 0 or altura_float > 10:
+        if altura_float <= 0.5 or altura_float >= 10:
             raise ValueError("Altura fuera de rango")
     except ValueError:
-        messagebox.showerror("Entrada inválida", "Por favor ingrese un número flotante entre 0 y 10.")
+        messagebox.showerror("Entrada inválida", "Por favor ingrese un número flotante entre 0.5 y 10.")
         return
 
     # Enviar altura al ESP32
@@ -56,7 +56,7 @@ def animate(i, dataList, ser):
     tanque_canvas.create_rectangle(50, nivel_tanque, 150, 100, fill="blue", tags="nivel")
 
     # Actualizar etiqueta con altura
-    etiqueta_altura.config(text=f"Altura actual: {SP32Data_float:.2f} cm")
+    etiqueta_altura.config(text=f"Altura actual: {SP32Data_float:.2f} ± 0.5 cm")
 
 # Configuración de la interfaz de Tkinter
 root = tk.Tk()
@@ -106,7 +106,6 @@ canvas_widget.pack()
 
 # Configuración de comunicación serial
 ser = serial.Serial("/dev/ttyACM0", 9600)
-time.sleep(2)
 
 # Animación
 ani = animation.FuncAnimation(fig, animate, frames=100, fargs=(dataList, ser), interval=100)
