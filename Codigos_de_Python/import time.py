@@ -1,118 +1,95 @@
-import time
 import serial
+import time
+import threading
 import tkinter as tk
-from tkinter import messagebox
-from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 
-def iniciar_proceso():
-    """Función para iniciar la lectura de datos y animación."""
-    altura = entrada_altura.get()
+# Configuración del puerto serial (ajustar 'COMx' según el sistema operativo)
+arduino = serial.Serial('/dev/ttyACM0', 115200, timeout=1)  # Ajusta el puerto según tu configuración
 
+# Tiempo de espera para establecer conexión
+time.sleep(2)
+
+setpoint = 25  # Setpoint inicial
+actual_temperature = 25  # Temperatura inicial
+temperatures = []  # Lista para almacenar valores de temperatura
+
+# Función para enviar el setpoint al Arduino y asegurarse de que se procese inmediatamente
+def actualizar_setpoint():
+    global setpoint
     try:
-        # Validación de que la altura es un flotante
-        altura_float = float(altura)
-        if altura_float <= 0.5 or altura_float >= 10:
-            raise ValueError("Altura fuera de rango")
+        setpoint = int(entrada_setpoint.get())
+        if 35 <= setpoint <= 55:
+            arduino.write(f"S{setpoint}\n".encode())
+            print(f"Setpoint enviado: {setpoint}")
+            # Limpiar el buffer de entrada para evitar retrasos
+            while arduino.in_waiting > 0:
+                arduino.readline()
+        else:
+            print("Setpoint fuera de rango (35-55°C)")
     except ValueError:
-        messagebox.showerror("Entrada inválida", "Por favor ingrese un número flotante entre 0.5 y 10.")
-        return
+        print("Error: Ingrese un número válido")
 
-    # Enviar altura al ESP32
-    ser.write(b'g\n')  # Comando para recibir datos
-    ser.write(f"{altura_float}\n".encode('ascii'))  # Enviamos la altura como string codificada
-
-    # Iniciar animación
-    ani.event_source.start()
-
-def enviar_panic():
-    """Función para enviar el comando de emergencia 'stop' al ESP32."""
-    ser.write(b'stop\n')
-    messagebox.showwarning("Pánico activado", "Se envió el comando de emergencia 'stop' al ESP32.")
-
-def animate(i, dataList, ser):
-    """Función para animar la gráfica y actualizar el nivel del tanque."""
-    ser.write(b'g\n')  # Comando para recibir datos
-    try:
-        # Leer y decodificar el dato recibido
-        SP32Data_string = ser.readline().decode('ascii').strip()
-        # Convertir a flotante
-        SP32Data_float = float(SP32Data_string)
-        dataList.append(SP32Data_float)
-    except ValueError:
-        return  # Salir de la función si no se puede convertir
-
-    dataList = dataList[-50:]  # Limitamos la lista a 50 elementos
-    ax.clear()
-    ax.plot(dataList)
-    ax.set_ylim([0, 12])
-    ax.set_title("Nivel de control")
-    ax.set_ylabel("Altura del agua (cm)")
-
-    # Actualizar visualización del tanque
-    tanque_canvas.delete("nivel")
-    nivel_tanque = max(0, min(100, 100 - SP32Data_float * 10))  # Escala de 0 a 100 (10 cm a 0)
-    tanque_canvas.create_rectangle(50, nivel_tanque, 150, 100, fill="blue", tags="nivel")
-
-    # Actualizar etiqueta con altura
-    etiqueta_altura.config(text=f"Altura actual: {SP32Data_float:.2f} ± 0.5 cm")
-
-# Configuración de la interfaz de Tkinter
+# Crear la ventana de Tkinter
 root = tk.Tk()
-root.title("Control de nivel con ESP32")
+root.title("Control PID de Temperatura")
+root.geometry("1000x700")
 
-# Entrada de altura
-frame = tk.Frame(root)
-frame.pack(pady=10)
+# Etiqueta y campo de entrada para el setpoint
+tk.Label(root, text="Setpoint (35-55°C):").pack(pady=5)
+entrada_setpoint = tk.Entry(root)
+entrada_setpoint.insert(0, "25")  # Valor por defecto
+entrada_setpoint.pack(pady=5)
 
-tk.Label(frame, text="Ingrese altura (0 a 10 cm):").pack(side=tk.LEFT)
-entrada_altura = tk.Entry(frame)
-entrada_altura.pack(side=tk.LEFT)
+boton_actualizar = tk.Button(root, text="Actualizar Setpoint", command=actualizar_setpoint)
+boton_actualizar.pack(pady=10)
 
-btn_iniciar = tk.Button(frame, text="Iniciar", command=iniciar_proceso)
-btn_iniciar.pack(side=tk.LEFT)
+# Etiqueta para mostrar la temperatura actual
+label_temp = tk.Label(root, text="Temperatura Actual: 0°C", font=("Arial", 14), fg="red")
+label_temp.pack(pady=10)
 
-# Botón de pánico
-btn_panic = tk.Button(root, text="Emergencia", command=enviar_panic, bg="red", fg="white")
-btn_panic.pack(pady=10)
-
-# Canvas para la visualización del tanque
-tanque_canvas = tk.Canvas(root, width=200, height=120, bg="white")
-tanque_canvas.pack(pady=10)
-
-# Dibujar el contorno del tanque
-tanque_canvas.create_rectangle(50, 0, 150, 100, outline="black", width=2)
-
-# Dibujar escala de la "regla"
-for i in range(11):
-    y = 100 - i * 10
-    tanque_canvas.create_line(45, y, 50, y, fill="black", width=2)  # Marcas de la regla
-    tanque_canvas.create_text(35, y, text=f"{i}", anchor="e", font=("Arial", 8))  # Etiquetas
-
-# Etiqueta para mostrar la altura actual
-etiqueta_altura = tk.Label(root, text="Altura actual: 0.00 cm", font=("Arial", 12))
-etiqueta_altura.pack(pady=5)
-
-# Gráfica con matplotlib incrustada en Tkinter
-fig = Figure(figsize=(5, 3), dpi=100)
-ax = fig.add_subplot(111)
-
-dataList = []
+# Crear figura de Matplotlib
+fig, ax = plt.subplots(figsize=(7, 5))
+ax.set_ylim(0, 70)
+ax.set_title("Evolución de la Temperatura")
+ax.set_ylabel("Temperatura (°C)")
+ax.set_xlabel("Tiempo (s)")
+line, = ax.plot([], [], 'r-', label="Temperatura")
+ax.legend()
 
 canvas = FigureCanvasTkAgg(fig, master=root)
-canvas_widget = canvas.get_tk_widget()
-canvas_widget.pack()
+canvas.get_tk_widget().pack()
 
-# Configuración de comunicación serial
-ser = serial.Serial("/dev/ttyACM0", 9600)
+def actualizar_grafica(i):
+    if len(temperatures) > 50:
+        temperatures.pop(0)  # Limitar la cantidad de datos en la gráfica
+    line.set_data(range(len(temperatures)), temperatures)
+    ax.relim()
+    ax.autoscale_view()
+    canvas.draw()
 
-# Animación
-ani = animation.FuncAnimation(fig, animate, frames=100, fargs=(dataList, ser), interval=100)
-ani.event_source.stop()  # Detenemos la animación hasta que se presione el botón
+ani = animation.FuncAnimation(fig, actualizar_grafica, interval=500)
 
-# Ejecutar la aplicación
+# Función para actualizar la temperatura en la interfaz
+def actualizar_temperatura():
+    global actual_temperature
+    try:
+        if arduino.in_waiting > 0:
+            actual_temperature = arduino.readline().decode('utf-8').strip()
+            label_temp.config(text=f"Temperatura Actual: {actual_temperature}°C")
+            temperatures.append(float(actual_temperature))
+    except Exception as e:
+        print(f"Error en la lectura serial: {e}")
+    root.after(500, actualizar_temperatura)  # Repetir cada 500 ms
+
+# Inicia la actualización de temperatura
+actualizar_temperatura()
+
+# Ejecutar la interfaz Tkinter
 root.mainloop()
 
-# Cerrar comunicación serial al cerrar la aplicación
-ser.close()
+# Cierra el puerto serial al cerrar la aplicación
+arduino.close()
+print("Conexión cerrada.")
